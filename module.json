@@ -3,7 +3,6 @@
     "title": "Happytreedice Map Note Hover Display",
     "description": "Displays the contents of the journal entry for a map note when the map note is hovered",
     "version": "1.0.0",
-    "author": "Happytreedice",
     "esmodules": [
         "./map-note-hover-display.js"
     ],
