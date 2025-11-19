@@ -1,0 +1,39 @@
+{
+    "id": "map-note-hover-display",
+    "title": "Map Note Hover Display",
+    "description": "Displays the contents of the journal entry for a map note when the map note is hovered",
+    "version": "1.0.5",
+    "author": "",
+    "esmodules": [
+        "./map-note-hover-display.js"
+    ],
+    "manifest": "https://gitlab.com/friendlylambda/map-note-hover-display/-/raw/main/module.json",
+    "download": "https://gitlab.com/friendlylambda/map-note-hover-display/-/archive/v1.0.5/map-note-hover-display-v1.0.5.zip",
+    "packs": [],
+    "styles": [
+        "./styles.css"
+    ],
+    "compatibility": {
+        "minimum": "13",
+        "verified": "13",
+        "maximum": "13"
+    },
+    "relationships": {
+        "systems": [
+            {
+                "id": "daggerheart",
+                "type": "system",
+                "compatibility": {}
+            }
+        ]
+    },
+    "authors": [
+        {
+            "name": "FriendlyLambda",
+            "url": "https://gitlab.com/friendlylambda/map-note-hover-display",
+            "discord": "billibow",
+            "flags": {}
+        }
+    ],
+    "flags": {}
+}

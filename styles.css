@@ -1,0 +1,51 @@
+.map-note-hover-display {
+  transition: opacity 0.2s ease-in-out;
+}
+
+.map-note-hover-display .hover-display-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 3px;
+}
+
+.map-note-hover-display .hover-display-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 0.9em;
+}
+
+.map-note-hover-display .hover-display-content table,
+.map-note-hover-display .hover-display-content th,
+.map-note-hover-display .hover-display-content td {
+  border: 1px solid #7a7971;
+}
+
+.map-note-hover-display .hover-display-content th,
+.map-note-hover-display .hover-display-content td {
+  padding: 6px;
+  text-align: left;
+}
+
+.map-note-hover-display .hover-display-content th {
+  background: rgba(122, 121, 113, 0.3);
+}
+
+/* Стили для скроллбара */
+.map-note-hover-display::-webkit-scrollbar {
+  width: 8px;
+}
+
+.map-note-hover-display::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.map-note-hover-display::-webkit-scrollbar-thumb {
+  background: rgba(255, 215, 0, 0.5);
+  border-radius: 4px;
+}
+
+.map-note-hover-display::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 215, 0, 0.7);
+}
