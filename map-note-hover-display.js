@@ -1,357 +1,234 @@
-const MODULE_NAME = "map-note-hover-display"
-const ELEMENT_ID = "map-note-hover-display"
+const MODULE_NAME = "map-note-hover-display";
 
-class MapNoteHoverDisplay {
+// Используем деструктуризацию для доступа к API v2
+const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+
+class MapNoteHoverDisplay extends HandlebarsApplicationMixin(ApplicationV2) {
   constructor() {
-    this.note = null;
-    this.element = null;
-    this.timeout = null;
+    super();
+    this.currentNote = null;
+    this.hoverTimeout = null;
+    this.content = { title: "", body: "" };
   }
 
-  createElement() {
-    if (this.element) return;
-    
-    this.element = document.createElement('div');
-    this.element.id = ELEMENT_ID;
-    this.element.className = 'map-note-hover-display';
-    
-    // Применяем базовые стили
-    this.applyStyles();
-    
-    document.body.appendChild(this.element);
+  static DEFAULT_OPTIONS = {
+    tag: "div",
+    id: "map-note-hover-display",
+    classes: ["map-note-hover-display"],
+    // Отключаем стандартную рамку окна, так как это тултип
+    window: {
+      frame: false,
+      title: "Map Note Hover",
+      controls: []
+    },
+    position: {
+      width: "auto",
+      height: "auto"
+    }
+  };
+
+  /** @override */
+  static PARTS = {
+    content: {
+      template: "modules/map-note-hover-display/template.html", // Убедитесь, что путь совпадает с вашей структурой папок
+    },
+  };
+
+  /** @override */
+  async _prepareContext(_options) {
+    // Передаем данные в шаблон
+    return {
+      title: this.content.title,
+      body: this.content.body,
+      classes: "" // Можно добавить дополнительные классы если нужно
+    };
   }
 
-  applyStyles() {
-    const fontSize = game.settings.get(MODULE_NAME, "fontSize") || "14px";
-    const darkMode = game.settings.get(MODULE_NAME, "darkMode");
-    const maxWidth = game.settings.get(MODULE_NAME, "maxWidth") || 400;
-
-    this.element.style.cssText = `
-      position: fixed;
-      z-index: 1000;
-      background: ${darkMode ? 'rgba(0, 0, 0, 0.95)' : 'rgba(255, 255, 255, 0.95)'};
-      border: 2px solid ${darkMode ? '#7a7971' : '#c9c7b8'};
-      border-radius: 5px;
-      padding: 15px;
-      max-width: ${maxWidth}px;
-      max-height: 500px;
-      overflow-y: auto;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-      pointer-events: none;
-      font-family: "Signika", sans-serif;
-      font-size: ${fontSize};
-      color: ${darkMode ? '#f0f0e0' : '#191813'};
-      line-height: 1.4;
-      display: none;
-      backdrop-filter: blur(5px);
-    `;
-  }
-
+  /**
+   * Показывает тултип для заметки
+   * @param {Note} note 
+   */
   async show(note) {
-    if (!note?.entry) return;
-    
-    this.note = note;
-    this.createElement();
-    
+    if (!note?.document?.entryId) return;
+    this.currentNote = note;
+
     try {
-      const entry = note.entry;
-      
-      // Получаем содержимое журнала - правильный способ
-      let content = await this.getJournalContent(entry);
-      
-      if (!content) {
-        this.element.innerHTML = `
-          <div class="hover-display-title" style="
-            font-weight: bold;
-            font-size: 1.2em;
-            margin-bottom: 10px;
-            padding-bottom: 5px;
-            border-bottom: 1px solid ${game.settings.get(MODULE_NAME, "darkMode") ? '#7a7971' : '#c9c7b8'};
-            color: ${game.settings.get(MODULE_NAME, "darkMode") ? '#ffd700' : '#825000'};
-          ">${entry.name}</div>
-          <div class="hover-display-content"><em>No content available</em></div>
-        `;
+      const entry = await fromUuid(note.document.entry.uuid);
+
+      if (!entry) {
+        this.setContent(note.document.label || "Unknown", "<em>No content available</em>");
       } else {
-        // Обрабатываем HTML
-        const enrichedContent = await TextEditor.enrichHTML(content, {
-          async: true,
-          secrets: entry.isOwner,
-          relativeTo: entry
-        });
-        
-        // Создаем HTML содержимое
-        this.element.innerHTML = `
-          <div class="hover-display-title" style="
-            font-weight: bold;
-            font-size: 1.2em;
-            margin-bottom: 10px;
-            padding-bottom: 5px;
-            border-bottom: 1px solid ${game.settings.get(MODULE_NAME, "darkMode") ? '#7a7971' : '#c9c7b8'};
-            color: ${game.settings.get(MODULE_NAME, "darkMode") ? '#ffd700' : '#825000'};
-          ">${entry.name}</div>
-          <div class="hover-display-content">${enrichedContent}</div>
-        `;
+        // Получаем содержимое журнала (совместимо с v10+)
+        const page = entry.pages.contents[0];
+        let bodyContent = "";
+
+        if (page) {
+          if (page.type === "text") {
+            bodyContent = await TextEditor.enrichHTML(page.text.content, {
+              async: true,
+              secrets: entry.isOwner,
+              relativeTo: entry
+            });
+          } else if (page.type === "image") {
+            bodyContent = `<img src="${page.src}" title="${page.image.caption || ''}"/>`;
+          } else {
+            bodyContent = "<em>Page type not supported for preview</em>";
+          }
+        } else {
+          bodyContent = "<em>No pages in this journal</em>";
+        }
+
+        this.setContent(entry.name, bodyContent);
       }
-      
-      // Показываем и позиционируем
-      this.positionElement();
-      this.element.style.display = 'block';
-      
+
+      // Рендерим приложение
+      await this.render({ force: true });
+
+      // Позиционируем после рендера (чтобы знать размеры)
+      this.updatePosition();
+
     } catch (error) {
       console.error("MapNoteHoverDisplay | Error loading journal entry:", error);
-      this.showError("Error loading content");
+      this.setContent("Error", "Error loading content");
+      this.render({ force: true });
     }
   }
 
-  async getJournalContent(entry) {
-    try {
-      // Для Foundry VTT version 10 и выше
-      if (game.release?.generation >= 10) {
-        // Если запись уже загружена, используем ее
-        if (entry.pages && entry.pages.size > 0) {
-          const firstPage = Array.from(entry.pages.values())[0];
-          return firstPage.text?.content || firstPage.text?.markdown || "";
-        }
-        
-        // Если нет, пытаемся получить содержимое через sheets
-        const sheet = entry.sheet;
-        if (sheet && sheet._getSheetData) {
-          const data = await sheet._getSheetData();
-          if (data.pages && data.pages.length > 0) {
-            return data.pages[0].text?.content || data.pages[0].text?.markdown || "";
-          }
-        }
-      } 
-      // Для Foundry VTT version 9 и ниже
-      else {
-        // Пытаемся получить содержимое через данные записи
-        if (entry.data.pages && entry.data.pages.length > 0) {
-          const firstPage = entry.data.pages[0];
-          return firstPage.text?.content || firstPage.text?.markdown || firstPage.text || "";
-        }
-        
-        // Альтернативный метод - используем sheet для получения данных
-        if (entry.sheet) {
-          const content = entry.sheet.element?.find('.journal-page-content')?.html();
-          if (content) return content;
-        }
-      }
-      
-      // Если ничего не сработало, возвращаем пустую строку
-      return "";
-      
-    } catch (error) {
-      console.error("MapNoteHoverDisplay | Error getting journal content:", error);
-      return "";
-    }
-  }
-
-  showError(message) {
-    this.element.innerHTML = `
-      <div class="hover-display-title" style="
-        font-weight: bold;
-        font-size: 1.2em;
-        margin-bottom: 10px;
-        padding-bottom: 5px;
-        border-bottom: 1px solid #ff4444;
-        color: #ff4444;
-      ">Error</div>
-      <div class="hover-display-content">${message}</div>
-    `;
-    this.positionElement();
-    this.element.style.display = 'block';
-  }
-
-  positionElement() {
-    if (!this.note || !this.element) return;
-    
-    try {
-      // Получаем позицию заметки на экране
-      const position = this.note.getGlobalPosition();
-      const iconWidth = this.note.icon?.width || 40;
-      const iconHeight = this.note.icon?.height || 40;
-      
-      const mouseX = position.x;
-      const mouseY = position.y;
-      
-      // Временно показываем элемент для вычисления размеров
-      const wasVisible = this.element.style.display !== 'none';
-      if (!wasVisible) {
-        this.element.style.display = 'block';
-        this.element.style.visibility = 'hidden';
-      }
-      
-      const elementWidth = this.element.offsetWidth;
-      const elementHeight = this.element.offsetHeight;
-      
-      if (!wasVisible) {
-        this.element.style.display = 'none';
-        this.element.style.visibility = 'visible';
-      }
-      
-      const windowWidth = window.innerWidth;
-      const windowHeight = window.innerHeight;
-      
-      // Определяем позицию (справа или слева от курсора)
-      let left = mouseX + 20;
-      let top = mouseY + 20;
-      
-      // Проверяем, чтобы не выходить за границы экрана
-      if (left + elementWidth > windowWidth) {
-        left = mouseX - elementWidth - 20;
-      }
-      
-      if (top + elementHeight > windowHeight) {
-        top = mouseY - elementHeight - 20;
-      }
-      
-      // Убеждаемся, что элемент не выходит за верхнюю/левую границу
-      left = Math.max(10, left);
-      top = Math.max(10, top);
-      
-      this.element.style.left = left + 'px';
-      this.element.style.top = top + 'px';
-      
-    } catch (error) {
-      console.error("MapNoteHoverDisplay | Error positioning element:", error);
-    }
+  setContent(title, body) {
+    this.content = { title, body };
   }
 
   hide() {
-    if (this.timeout) {
-      clearTimeout(this.timeout);
-      this.timeout = null;
-    }
-    
-    if (this.element) {
-      this.element.style.display = 'none';
-      this.element.innerHTML = '';
-    }
-    
-    this.note = null;
+    this.currentNote = null;
+    this.close();
   }
 
   delayedHide() {
-    // Небольшая задержка перед скрытием для плавности
-    this.timeout = setTimeout(() => {
+    this.hoverTimeout = setTimeout(() => {
       this.hide();
     }, 100);
   }
 
   clearDelayedHide() {
-    if (this.timeout) {
-      clearTimeout(this.timeout);
-      this.timeout = null;
+    if (this.hoverTimeout) {
+      clearTimeout(this.hoverTimeout);
+      this.hoverTimeout = null;
     }
+  }
+
+  updatePosition() {
+    if (!this.currentNote || !this.element) return;
+
+    const note = this.currentNote;
+    // Получаем глобальные координаты заметки на экране
+    // worldTransform трансформирует координаты канваса в координаты экрана (viewport)
+    const t = note.worldTransform;
+    const noteX = t.tx;
+    const noteY = t.ty;
+
+    // Размеры элемента
+    const elWidth = this.element.offsetWidth || 300;
+    const elHeight = this.element.offsetHeight || 200;
+
+    // Отступы
+    const offset = 20;
+    let left = noteX + offset;
+    let top = noteY + offset;
+
+    // Проверка границ экрана
+    if (left + elWidth > window.innerWidth) {
+      left = noteX - elWidth - offset;
+    }
+    if (top + elHeight > window.innerHeight) {
+      top = noteY - elHeight - offset;
+    }
+
+    // Установка позиции
+    // ApplicationV2 использует this.setPosition, но для hover-элементов без рамки
+    // надежнее и плавнее менять стиль напрямую, чтобы не триггерить полный пересчет окна
+    this.element.style.left = `${Math.max(10, left)}px`;
+    this.element.style.top = `${Math.max(10, top)}px`;
+
+    // Применяем настройки ширины
+    const maxWidth = game.settings.get(MODULE_NAME, "maxWidth");
+    this.element.style.maxWidth = `${maxWidth}px`;
+
+    // Применяем настройки шрифта
+    const fontSize = game.settings.get(MODULE_NAME, "fontSize");
+    this.element.style.fontSize = fontSize;
   }
 }
 
 function registerSettings() {
   game.settings.register(MODULE_NAME, "enabled", {
-    name: "Show map note hover display",
-    hint: "Display the journal entry for a map note when it's hovered",
+    name: "Enable Hover Display", // Исправлено для корректного отображения
+    hint: "Show journal contents when hovering over map notes.",
     scope: "client",
     type: Boolean,
     default: true,
     config: true,
   });
-  
-  game.settings.register(MODULE_NAME, "darkMode", {
-    name: "Dark Mode",
-    hint: "Show with light text on a dark background",
-    scope: "client",
-    type: Boolean,
-    default: true,
-    config: true,
-  });
-  
+
   game.settings.register(MODULE_NAME, "fontSize", {
-    name: "Text size",
-    hint: "Text size for the display (e.g., 14px, 1.2rem)",
+    name: "Text Size",
+    hint: "CSS font size value (e.g. 14px, 1rem).",
     scope: "client",
     type: String,
     default: "14px",
     config: true,
   });
-  
+
   game.settings.register(MODULE_NAME, "maxWidth", {
-    name: "Maximum Width",
-    hint: "The maximum width the entry display can grow to before it'll force wrapping.",
+    name: "Maximum Width (px)",
+    hint: "Maximum width of the popup window.",
     scope: "client",
     type: Number,
     default: 400,
     config: true,
   });
-  
+
   game.settings.register(MODULE_NAME, "delay", {
-    name: "Display Delay",
-    hint: "Delay before showing the display (milliseconds)",
+    name: "Hover Delay (ms)",
+    hint: "Time in milliseconds before the popup appears.",
     scope: "client",
     type: Number,
     default: 300,
-    range: {
-      min: 0,
-      max: 2000,
-      step: 100
-    },
+    range: { min: 0, max: 2000, step: 100 },
     config: true,
   });
 }
 
-Hooks.on("init", () => {
+Hooks.once("init", () => {
   registerSettings();
 });
 
 Hooks.once("ready", () => {
-  // Инициализируем дисплей
-  if (!canvas.hud.mapNoteHoverDisplay) {
-    canvas.hud.mapNoteHoverDisplay = new MapNoteHoverDisplay();
-  }
+  canvas.hud.mapNoteHoverDisplay = new MapNoteHoverDisplay();
 });
 
 Hooks.on("hoverNote", (note, hovered) => {
   if (!game.settings.get(MODULE_NAME, "enabled")) return;
-  
+
   const display = canvas.hud.mapNoteHoverDisplay;
   if (!display) return;
-  
+
   if (hovered) {
     display.clearDelayedHide();
-    
-    // Задержка перед показом
     setTimeout(() => {
-      if (note.mouseInteractionManager?.state === 1) { // HOVERED state
+      // Проверяем, что мышь все еще над объектом (state 1 = HOVER)
+      if (note.hover) {
         display.show(note);
       }
     }, game.settings.get(MODULE_NAME, "delay"));
-    
   } else {
     display.delayedHide();
   }
 });
 
-// Дополнительный обработчик для движения мыши
-Hooks.on("refreshNote", (note) => {
-  const display = canvas.hud.mapNoteHoverDisplay;
-  if (!display || !display.element || display.element.style.display === 'none') return;
-  
-  if (display.note === note && note.mouseInteractionManager?.state === 1) {
-    display.positionElement();
-  }
-});
-
-// Очистка при изменении сцены
+// Обновление позиции при зуме/панорамировании
 Hooks.on("canvasPan", () => {
   const display = canvas.hud.mapNoteHoverDisplay;
-  if (display) {
-    display.hide();
-  }
-});
-
-// Очистка при закрытии приложения
-Hooks.on("closeApplication", () => {
-  const display = canvas.hud.mapNoteHoverDisplay;
-  if (display) {
-    display.hide();
+  if (display && display.rendered) {
+    display.updatePosition();
   }
 });

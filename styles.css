@@ -1,51 +1,88 @@
+/* Основной контейнер */
 .map-note-hover-display {
-  transition: opacity 0.2s ease-in-out;
+  position: fixed;
+  z-index: var(--z-index-tooltip, 1000);
+  /* Используем системный z-index */
+
+  /* Автоматическая тема Foundry */
+  background: var(--color-bg-alpha, rgba(0, 0, 0, 0.9));
+  border: 1px solid var(--color-border-light-2);
+  color: var(--color-text-light-primary);
+  box-shadow: 0 0 10px var(--color-shadow-dark);
+
+  border-radius: 5px;
+  padding: 10px;
+  max-height: 500px;
+  overflow-y: auto;
+  pointer-events: none;
+  /* Пропускаем клики сквозь окно */
+  backdrop-filter: blur(5px);
+
+  /* Типографика Foundry */
+  font-family: var(--font-primary);
+  line-height: 1.4;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
-.map-note-hover-display .hover-display-content img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 3px;
-}
-
-.map-note-hover-display .hover-display-content table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 8px 0;
-  font-size: 0.9em;
-}
-
-.map-note-hover-display .hover-display-content table,
-.map-note-hover-display .hover-display-content th,
-.map-note-hover-display .hover-display-content td {
-  border: 1px solid #7a7971;
-}
-
-.map-note-hover-display .hover-display-content th,
-.map-note-hover-display .hover-display-content td {
-  padding: 6px;
+/* Заголовок */
+.map-note-hover-display h1 {
+  margin: 0;
+  padding-bottom: 5px;
+  border-bottom: 2px solid var(--color-underline-header);
+  font-size: 1.2em;
+  font-weight: bold;
+  color: var(--color-text-hyperlink);
+  /* Цвет заголовков */
   text-align: left;
 }
 
-.map-note-hover-display .hover-display-content th {
-  background: rgba(122, 121, 113, 0.3);
+/* Контент */
+.map-note-hover-display #content {
+  font-size: inherit;
 }
 
-/* Стили для скроллбара */
+/* Изображения внутри контента */
+.map-note-hover-display #content img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--color-border-dark);
+  border-radius: 2px;
+}
+
+/* Таблицы */
+.map-note-hover-display table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-bg-light);
+  color: var(--color-text-dark-primary);
+  /* Таблицы обычно светлые */
+}
+
+.map-note-hover-display th,
+.map-note-hover-display td {
+  border: 1px solid var(--color-border-dark-tertiary);
+  padding: 4px;
+}
+
+.map-note-hover-display th {
+  background: var(--color-bg-highlight);
+  font-weight: bold;
+}
+
+/* Скроллбар (стилизуем под Foundry) */
 .map-note-hover-display::-webkit-scrollbar {
   width: 8px;
 }
 
 .map-note-hover-display::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  background: var(--color-scrollbar-track);
 }
 
 .map-note-hover-display::-webkit-scrollbar-thumb {
-  background: rgba(255, 215, 0, 0.5);
+  background: var(--color-scrollbar-thumb);
+  border: 1px solid var(--color-border-dark);
   border-radius: 4px;
-}
-
-.map-note-hover-display::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 215, 0, 0.7);
 }
